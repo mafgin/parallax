@@ -44,12 +44,24 @@ Wikipedia language editions).
 - `https://*.wikipedia.org/*` — to read the current article and fetch its
   parallel-language editions from Wikipedia for the comparison.
 
-## Note on other browsers
+## Firefox
 
-This policy describes the Chrome / Edge release, which translates fully
-on-device. A future Firefox release (where on-device translation of some
-languages is not yet available) may use an online translation fallback; if so,
-that data flow will be disclosed separately before release.
+Firefox does not expose an on-device translator to extensions, so **the Firefox
+version of Parallax translates online**: the text of the articles you choose to
+compare is sent to Google's free translation endpoint
+(`translate.googleapis.com`) and the translation is returned to your browser.
+
+- **What is sent:** only the text of the comparison articles you open (which is
+  public Wikipedia content), plus the source/target language codes.
+- **What is NOT sent:** nothing else — no URLs of other pages you visit, no
+  identifiers, no cookies from us, no browsing history.
+- This is disclosed in Firefox's install dialog (data collection: website
+  content) and in a one-time notice inside the extension the first time online
+  translation runs.
+- Translations are cached locally so the same article is not re-sent.
+
+On Chrome / Edge this does not apply — translation is fully on-device and the
+Chrome package contains no online-translation code.
 
 ## Contact
 

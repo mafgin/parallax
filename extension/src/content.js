@@ -644,6 +644,17 @@
       );
     }
 
+    // One-time transparency notice: the first time the online path fires,
+    // say so in-product (the install dialog discloses it too, via
+    // data_collection_permissions, but consent should be visible where it acts).
+    const { wlGoogleNoticeShown } = await browser.storage.local.get("wlGoogleNoticeShown");
+    if (!wlGoogleNoticeShown) {
+      setStatus(
+        "Note: on this browser, translation uses Google's free online service — the text of compared articles is sent to Google. Chrome/Edge translate fully on-device."
+      );
+      browser.storage.local.set({ wlGoogleNoticeShown: true });
+    }
+
     const CH = 8;
     let done = 0;
     let failed = 0;
