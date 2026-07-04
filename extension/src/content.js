@@ -1,9 +1,9 @@
 /**
- * WikiLens content script — runs on *.wikipedia.org/wiki/*.
+ * Parallax content script — runs on *.wikipedia.org/wiki/*.
  *
- * Splits the window: the live Wikipedia article on the left; the right pane
- * holds one or more COLUMNS, each the same article from another language
- * edition, rendered with Wikipedia's structure and translated in place.
+ * Full-screen overlay reader: the source article is re-rendered as the FIRST
+ * column, and every added language is another column — the same article from
+ * another edition, rendered with Wikipedia's structure and translated in place.
  *
  *   • "+" adds a column        — equal parts auto-divide (orig + N cols all the
  *                                same width); narrow columns → mobile layout.
@@ -154,8 +154,11 @@
     s.id = "wikilens-split-style";
     // Full-screen overlay: the source article is rendered as the first column
     // (same renderer as the translations), so everything shares one design.
+    // The html class locks the underlying page's scroll while the overlay is
+    // open — otherwise space/arrow keys still scroll the dead page beneath.
     s.textContent = `
       #${PANE_ID} { position: fixed; inset: 0; z-index: 2147483647; background: #fff; }
+      html.${SPLIT_CLASS} { overflow: hidden !important; }
     `;
     document.documentElement.appendChild(s);
   }
@@ -186,7 +189,7 @@
 
     const root = mk("div", { class: "wl-root" }, [
       mk("header", { class: "wl-head" }, [
-        mk("div", { class: "wl-brand", text: "WikiLens" }),
+        mk("div", { class: "wl-brand", text: "Parallax" }),
         mk("button", { id: "wl-fsdown", class: "wl-fsbtn", title: "Smaller text", text: "A−" }),
         mk("button", { id: "wl-fsup", class: "wl-fsbtn", title: "Larger text", text: "A+" }),
         mk("button", { id: "wl-add", class: "wl-add", title: "Add a language column", text: "+ language" }),
@@ -230,14 +233,14 @@
   }
 
   async function applyFont() {
-    const { fontPx } = await browser.storage.local.get("fontPx");
-    host.style.setProperty("--wl-fs", (fontPx || 15) + "px");
+    const { wlFontPx } = await browser.storage.local.get("wlFontPx");
+    host.style.setProperty("--wl-fs", (wlFontPx || 15) + "px");
   }
   async function changeFont(d) {
-    const { fontPx } = await browser.storage.local.get("fontPx");
-    const v = Math.min(Math.max((fontPx || 15) + d, 11), 26);
+    const { wlFontPx } = await browser.storage.local.get("wlFontPx");
+    const v = Math.min(Math.max((wlFontPx || 15) + d, 11), 26);
     host.style.setProperty("--wl-fs", v + "px");
-    browser.storage.local.set({ fontPx: v });
+    browser.storage.local.set({ wlFontPx: v });
   }
 
   /* ----------------------------- open/close -------------------------- */
@@ -270,7 +273,10 @@
   async function initLanguages() {
     current = WL.wiki.getCurrentArticle();
     const { wlLangs } = await browser.storage.local.get("wlLangs");
-    desired = (Array.isArray(wlLangs) ? wlLangs : []).filter((l) => l !== current.lang);
+    // Keep the FULL saved set — an entry matching this wiki's own language is
+    // merely skipped for display (the source column covers it). Filtering it
+    // out here would make the next saveLangs() erase it permanently.
+    desired = Array.isArray(wlLangs) ? wlLangs.slice() : [];
 
     // the source article is always the first column, rendered like the rest
     if (!panes.has(current.lang)) openColumn(current.lang, { isSource: true });
@@ -289,7 +295,8 @@
     populatePicker();
     // restore the chosen comparison languages for THIS article
     desired.forEach((lang) => {
-      if (!panes.has(lang) && langlinks.some((l) => l.lang === lang)) openColumn(lang);
+      if (lang !== current.lang && !panes.has(lang) && langlinks.some((l) => l.lang === lang))
+        openColumn(lang);
     });
     if (order.length <= 1) togglePicker(true); // only the source is open → nudge to add
   }
@@ -356,7 +363,7 @@
       headKids = [mk("span", { class: "wl-colname", text: target.autonym + " · source" }), status, close];
     } else {
       langSel = mk("select", { class: "wl-collang", title: "Switch this column's language" });
-      srcBtn = mk("button", { class: "wl-colsrc", title: "Toggle original / translated", text: "מקור" });
+      srcBtn = mk("button", { class: "wl-colsrc", title: "Toggle original / translated", text: "Original" });
       headKids = [langSel, status, srcBtn, close];
     }
     const col = mk("div", { class: "wl-col" }, [mk("div", { class: "wl-colhead" }, headKids), body]);
@@ -366,6 +373,7 @@
     const pane = {
       lang, title: target.title, autonym: target.autonym, isSource,
       col, body, status, langSel, srcBtn, loading: true, showSource: false, art: null,
+      gen: 0, // bumped on every (re)load — stale async runs check it and stand down
     };
     panes.set(lang, pane);
     order.push(lang);
@@ -435,14 +443,19 @@
   function closeColumn(lang) {
     const p = panes.get(lang);
     if (p) {
+      p.gen++; // cancel any in-flight load/translation for this column
       if (ro) ro.unobserve(p.col);
       p.col.remove();
       panes.delete(lang);
       const i = order.indexOf(lang);
       if (i >= 0) order.splice(i, 1);
     }
-    desired = desired.filter((l) => l !== lang); // explicit close removes from the set
-    saveLangs();
+    // explicit close removes the language from the persisted set — except the
+    // source column, which was never part of the chosen comparison set
+    if (!p || !p.isSource) {
+      desired = desired.filter((l) => l !== lang);
+      saveLangs();
+    }
     refreshColLangSelects(); // the freed language is now available to other columns
     populatePicker();
     if (!order.length) togglePicker(true);
@@ -456,28 +469,35 @@
   /* --------------------------- load + translate ---------------------- */
 
   async function readingLang() {
-    const { readingLang } = await browser.storage.local.get("readingLang");
-    if (readingLang && readingLang !== "auto") return readingLang;
+    const { wlReadingLang } = await browser.storage.local.get("wlReadingLang");
+    if (wlReadingLang && wlReadingLang !== "auto") return wlReadingLang;
     return current.lang;
   }
 
   async function loadPane(pane) {
+    const gen = ++pane.gen;
     setColStatus(pane, "fetching…");
-    pane.art = await WL.wiki.fetchArticleHtml(pane.lang, pane.title);
-    await renderPaneBody(pane);
+    const art = await WL.wiki.fetchArticleHtml(pane.lang, pane.title);
+    if (gen !== pane.gen) return; // superseded by a language switch / close
+    pane.art = art;
+    await renderPaneBody(pane, gen);
   }
 
   // Render (or re-render) a column's body from the fetched article. Used on load
   // and when the user toggles "show original". Translation results are cached,
-  // so toggling back to the translation is instant.
-  async function renderPaneBody(pane) {
+  // so toggling back to the translation is instant. Every render owns a `gen`
+  // ticket; a newer render invalidates the older one's async continuations so a
+  // slow stale translation can't paint over (or mis-status) the fresh one.
+  async function renderPaneBody(pane, gen) {
+    if (gen == null) gen = ++pane.gen;
     const art = pane.art;
+    const dst = await readingLang();
+    if (gen !== pane.gen) return;
     const node = WL.wiki.buildArticleNode(art.html, pane.lang);
     pane.body.replaceChildren();
     pane.body.appendChild(mk("h1", { class: "wl-arttitle", dir: "auto", text: art.displayTitle }));
     pane.body.appendChild(node);
 
-    const dst = await readingLang();
     const showSrc = pane.isSource || pane.showSource || pane.lang === dst;
     pane.body.dir = WL.rtl.isRTL(showSrc ? pane.lang : dst) ? "rtl" : "ltr";
 
@@ -486,7 +506,8 @@
       setColStatus(pane, `rev ${art.revid} · ${pane.lang === dst ? "original" : "source"}`);
       return;
     }
-    const via = await translatePane(pane, art, dst);
+    const via = await translatePane(pane, art, dst, gen);
+    if (gen !== pane.gen) return;
     pane.loading = false;
     setColStatus(pane, `rev ${art.revid} · ${via}`);
   }
@@ -494,7 +515,7 @@
   function toggleSource(pane) {
     pane.showSource = !pane.showSource;
     pane.srcBtn.classList.toggle("active", pane.showSource);
-    pane.srcBtn.textContent = pane.showSource ? "תרגום" : "מקור";
+    pane.srcBtn.textContent = pane.showSource ? "Translation" : "Original";
     if (pane.art) renderPaneBody(pane).catch((e) => setColStatus(pane, "error: " + e.message, true));
   }
 
@@ -540,7 +561,8 @@
     window.location.href = url; // full nav → content script re-opens the set
   }
 
-  async function translatePane(pane, art, dst) {
+  async function translatePane(pane, art, dst, gen) {
+    const stale = () => gen !== pane.gen;
     const tasks = collectTasks(pane.body);
     const groups = new Map();
     const ordered = [];
@@ -562,6 +584,7 @@
       const r = await bg({ type: "cache-get", meta });
       if (r && r.value && r.value.pairs) map = new Map(r.value.pairs);
     } catch {}
+    if (stale()) return "";
 
     ordered.forEach((text) => {
       if (map.has(text)) applyGroup(groups.get(text), map.get(text));
@@ -569,50 +592,73 @@
 
     const missing = ordered.filter((t) => !map.has(t));
     let via = "cached";
+    let failed = 0;
     if (missing.length) {
-      const res = await streamTranslate(missing, pane.lang, dst, pane, (i, tr) => {
-        map.set(missing[i], tr);
+      const res = await streamTranslate(missing, pane.lang, dst, pane, stale, (i, tr, ok) => {
+        if (stale()) return;
+        // failed blocks paint the original text but are NOT cached, so the next
+        // visit retries them instead of freezing the failure until the next edit
+        if (ok) map.set(missing[i], tr);
         applyGroup(groups.get(missing[i]), tr); // progressive paint (plain text)
       });
+      if (stale()) return "";
       via = res.via;
+      failed = res.failed || 0;
       bg({ type: "cache-put", meta, value: { pairs: [...map] } }).catch(() => {});
     }
     relinkPass(tasks, map); // restore inline links once translations are in
-    return via;
+    return via + (failed ? ` · ${failed} blocks kept original` : "");
   }
 
-  async function streamTranslate(texts, src, dst, pane, onResult) {
-    const { provider } = await browser.storage.local.get("provider");
-    const mode = provider || "auto";
-    const prog = (d, t) => setColStatus(pane, `translating ${d}/${t}…`);
+  async function streamTranslate(texts, src, dst, pane, stale, onResult) {
+    const { wlProvider } = await browser.storage.local.get("wlProvider");
+    const mode = wlProvider || "auto";
+    const st = (text) => {
+      if (!stale()) setColStatus(pane, text);
+    };
+    const prog = (d, t) => st(`translating ${d}/${t}…`);
 
     if (mode !== "google" && WL.providers.builtinAvailable()) {
       const status = await WL.providers.builtinStatus(src, dst);
       if (status !== "unavailable") {
-        if (status !== "available") setColStatus(pane, "preparing translator…");
-        await WL.providers.translateBuiltinTexts(
+        if (status !== "available") st("preparing translator…");
+        const res = await WL.providers.translateBuiltinTexts(
           texts, src, dst, prog,
-          (l, t) => setColStatus(pane, `downloading translator ${Math.round((l / (t || 1)) * 100)}%…`),
-          onResult
+          (l, t) => st(`downloading translator ${Math.round((l / (t || 1)) * 100)}%…`),
+          onResult, stale
         );
-        return { via: "on-device" };
+        return { via: "on-device", failed: res.failed };
       }
       if (mode === "builtin") throw new Error(`on-device translator can't do ${src}→${dst}`);
     } else if (mode === "builtin") {
       throw new Error("on-device translator not available in this browser");
     }
 
+    // Online fallback — Firefox build only. The Chrome manifest deliberately has
+    // no translate.googleapis.com permission (on-device only, as the store
+    // listing says), so fail with a clear message instead of a blocked fetch.
+    const perms = browser.runtime.getManifest().host_permissions || [];
+    if (!perms.some((h) => h.includes("translate.googleapis.com"))) {
+      throw new Error(
+        `this browser can't translate ${src}→${dst} on-device, and this build has no online fallback`
+      );
+    }
+
     const CH = 8;
     let done = 0;
+    let failed = 0;
     for (let i = 0; i < texts.length; i += CH) {
+      if (stale()) break;
       const chunk = texts.slice(i, i + CH);
       const r = await bg({ type: "translate-google-texts", texts: chunk, src, dst });
-      if (r && r.error) throw new Error(r.error);
-      r.texts.forEach((tr, j) => onResult(i + j, tr));
+      if (!r || r.error) throw new Error((r && r.error) || "no response from background");
+      const bad = new Set(r.failedIdx || []);
+      r.texts.forEach((tr, j) => onResult(i + j, tr, !bad.has(j)));
+      failed += r.failed || 0;
       done += chunk.length;
       prog(done, texts.length);
     }
-    return { via: "google" };
+    return { via: "google", failed };
   }
 
   /* ----------------------- in-place text extraction ------------------ */
@@ -731,7 +777,7 @@
     }
   });
 
-  // Follow the user across navigation: if WikiLens was open, re-open it on the
+  // Follow the user across navigation: if Parallax was open, re-open it on the
   // next article automatically (Wikipedia browsing is article-to-article).
   (async function autoOpen() {
     if (!WL || !WL.wiki || !WL.wiki.isArticlePage()) return;

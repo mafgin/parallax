@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "WikiLens — Cross-Language Wikipedia",
+  "name": "Parallax — Compare Wikipedia Editions",
   "version": "0.1.0",
-  "description": "Read a Wikipedia article from another language edition, machine-translated, side by side — and see how each edition frames the topic.",
+  "description": "Read the same Wikipedia article from other language editions, translated side by side — see how each edition tells the story.",
   "icons": {
     "48": "icons/icon-48.png",
     "96": "icons/icon-96.png",
@@ -17,7 +17,7 @@
     "service_worker": "background.js"
   },
   "action": {
-    "default_title": "WikiLens",
+    "default_title": "Parallax",
     "default_popup": "popup.html",
     "default_icon": {
       "48": "icons/icon-48.png",
@@ -35,7 +35,6 @@
         "lib/browser-polyfill.js",
         "lib/rtl.js",
         "lib/wiki.js",
-        "lib/render.js",
         "lib/providers.js",
         "content.js"
       ],

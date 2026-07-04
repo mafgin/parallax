@@ -1,7 +1,7 @@
 /**
  * MediaWiki client + article cleaner. Runs in the content script.
  *
- * Everything here is the FREE, client-side half of WikiLens: discovering the
+ * Everything here is the FREE, client-side half of Parallax: discovering the
  * parallel-language editions of the current article and fetching one of them.
  * All calls use `origin=*` so the MediaWiki API returns permissive CORS headers
  * and works cross-wiki from the content script (en.wikipedia.org → ru.wikipedia
@@ -15,7 +15,7 @@
 
   // Browsers forbid overriding User-Agent from fetch(); MediaWiki honours
   // Api-User-Agent for client-side callers. Contact UA per Wikimedia policy.
-  const API_UA = "WikiLens/0.1 (https://afginlabs.com; mafgin@gmail.com)";
+  const API_UA = "Parallax/0.1 (https://afginlabs.com; mafgin@gmail.com)";
 
   const apiBase = (lang) => `https://${lang}.wikipedia.org/w/api.php`;
 
@@ -43,10 +43,16 @@
     "Category", "Portal", "Draft", "MediaWiki", "Module", "Book",
   ]);
 
+  // Mainspace check that works on EVERY language edition: MediaWiki stamps the
+  // body with the numeric namespace (`ns-0` = article), which is identical on
+  // he/ru/ar wikis where the namespace prefixes ("מיוחד:", "Служебная:") defeat
+  // any English-name list. The name list is only a fallback.
   function isArticlePage() {
     if (!/\/wiki\//.test(location.pathname)) return false;
     const { title } = getCurrentArticle();
     if (!title) return false;
+    const ns = document.body && document.body.className.match(/\bns-(-?\d+)\b/);
+    if (ns) return ns[1] === "0";
     if (title.includes(":") && NON_ARTICLE_NS.has(title.split(":")[0])) return false;
     return true;
   }
@@ -84,70 +90,9 @@
     }));
   }
 
-  // Fetch + clean one article. `revid` is the stable cache key (changes only on
-  // edit).
-  async function fetchArticle(lang, title) {
-    const data = await apiGet(lang, {
-      action: "parse",
-      page: title,
-      prop: "text|revid|displaytitle",
-      formatversion: "2",
-      redirects: "1",
-    });
-    if (data.error) throw new Error(data.error.info || "parse failed");
-    const html = (data.parse && data.parse.text) || "";
-    const revid = (data.parse && data.parse.revid) || 0;
-    const displayTitle = stripTags((data.parse && data.parse.displaytitle) || title);
-    return { lang, title, revid, displayTitle, blocks: cleanHtmlToBlocks(html) };
-  }
-
   function stripTags(s) {
     const doc = new DOMParser().parseFromString(s, "text/html");
     return (doc.body.textContent || "").trim();
-  }
-
-  const DROP_SELECTORS = [
-    "style", "script", "sup.reference", ".reference", ".mw-editsection",
-    ".navbox", ".infobox", ".metadata", ".mw-empty-elt", ".noprint",
-    ".hatnote", ".mw-jump-link", "#toc", ".toc", "table", ".thumb",
-    "figure", ".gallery", ".mbox-small", ".sistersitebox", ".portal",
-    ".navigation-not-searchable", ".shortdescription", "#coordinates",
-    ".mw-references-wrap", "ol.references", ".reflist", ".ambox",
-  ].join(",");
-
-  const KEEP = new Set(["P", "H2", "H3", "H4", "LI", "BLOCKQUOTE"]);
-
-  // Send PLAIN TEXT blocks (not HTML): smaller to translate, no sanitisation /
-  // CSP concern on re-render, chunkable on block boundaries.
-  function cleanHtmlToBlocks(html) {
-    const doc = new DOMParser().parseFromString(html, "text/html");
-    const root = doc.querySelector(".mw-parser-output") || doc.body;
-    root.querySelectorAll(DROP_SELECTORS).forEach((el) => el.remove());
-
-    const blocks = [];
-    const seen = new Set();
-    root.querySelectorAll("p, h2, h3, h4, li, blockquote").forEach((el) => {
-      const tag = el.tagName;
-      if (!KEEP.has(tag)) return;
-      // A list item that wraps block children (p/ul/ol) is captured via those
-      // children instead — skip it to avoid duplicated text.
-      if (tag === "LI" && el.querySelector("p, ul, ol")) return;
-      const text = normalize(el.textContent || "");
-      if (!text || text.length < 2) return;
-      const key = tag + "|" + text;
-      if (seen.has(key)) return;
-      seen.add(key);
-      blocks.push({ tag: tag.toLowerCase(), text });
-    });
-    return blocks;
-  }
-
-  function normalize(s) {
-    return s
-      .replace(/ /g, " ")
-      .replace(/\[\d+\]/g, "") // leftover citation markers rendered as text
-      .replace(/\s+/g, " ")
-      .trim();
   }
 
   // Fetch the article keeping its full HTML (structure + images + infobox +
@@ -200,9 +145,21 @@
     const fixUrl = (u) =>
       !u ? u : u.startsWith("//") ? "https:" + u : u.startsWith("/") ? base + u : u;
 
+    // Belt-and-braces: MediaWiki sanitises its parser output, but strip inline
+    // event handlers anyway before importing third-party HTML into the page.
+    root.querySelectorAll("*").forEach((e) => {
+      for (const at of [...e.attributes]) {
+        if (/^on/i.test(at.name)) e.removeAttribute(at.name);
+      }
+    });
+
     root.querySelectorAll("a[href]").forEach((a) => {
-      const href = a.getAttribute("href");
-      if (href && href.startsWith("/")) a.setAttribute("href", base + href);
+      const href = (a.getAttribute("href") || "").trim();
+      // fixUrl, not startsWith("/"): protocol-relative sister-project links
+      // (//commons.wikimedia.org/…) also start with "/" and must not get the
+      // wiki base prepended.
+      if (/^javascript:/i.test(href)) a.removeAttribute("href");
+      else a.setAttribute("href", fixUrl(href));
       // no target=_blank: the content script intercepts clicks to navigate the
       // whole comparison set in the same window (cmd/ctrl-click still new-tabs).
       a.setAttribute("rel", "noopener noreferrer");
@@ -259,9 +216,7 @@
     getCurrentArticle,
     isArticlePage,
     fetchLangLinks,
-    fetchArticle,
     fetchArticleHtml,
     buildArticleNode,
-    cleanHtmlToBlocks,
   };
 })();

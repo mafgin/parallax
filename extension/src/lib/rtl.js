@@ -7,7 +7,7 @@
   const WL = (globalThis.WL = globalThis.WL || {});
   const RTL = new Set([
     "he", "ar", "fa", "ur", "yi", "dv", "ps", "sd", "ckb", "arc",
-    "arz", "azb", "ckb", "ku", "nqo", "prs", "ug",
+    "arz", "azb", "ku", "nqo", "prs", "ug",
   ]);
   WL.rtl = {
     isRTL(lang) {

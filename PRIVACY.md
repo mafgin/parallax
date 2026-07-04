@@ -1,35 +1,37 @@
-# WikiLens — Privacy Policy
+# Parallax — Privacy Policy
 
-_Effective: 2026-06-14_
+_Effective: 2026-07-04_
 
-WikiLens is a browser extension that shows a Wikipedia article from other
+Parallax is a browser extension that shows a Wikipedia article from other
 language editions, translated, side by side. **It does not collect, transmit,
 sell, or share any personal data.** There are no accounts, no analytics, no
 tracking, and no servers operated by us.
 
 ## What it accesses, and why
 
-- **The Wikipedia article you're viewing.** When you open the panel, WikiLens
+- **The Wikipedia article you're viewing.** When you open the panel, Parallax
   reads the current article and fetches its parallel-language editions directly
   from Wikipedia's public API, in your browser, to display the comparison. This
   content is processed locally and is **not** sent to us or to any third party.
 - **On-device translation (Chrome / Edge).** Translation is performed entirely
   on your device using the browser's built-in Translator API. **Article text
-  never leaves your computer.**
+  never leaves your computer.** The Chrome package contains no online-translation
+  code.
 
 ## What it stores
 
-WikiLens stores a small amount of data **locally** in your browser
-(`storage.local`), never transmitted anywhere:
+Parallax stores a small amount of data **locally** in your browser
+(`storage.local` and a local translation cache), never transmitted anywhere:
 
 - your reading language, text size, and chosen comparison languages;
-- whether the panel is open, to keep it open as you browse.
+- whether the panel is open, to keep it open as you browse;
+- translations of articles you've already compared, so re-reads are instant.
 
 You can clear this at any time by removing the extension.
 
 ## Data we collect
 
-**None.** WikiLens does not collect or transmit personal or sensitive
+**None.** Parallax does not collect or transmit personal or sensitive
 information, browsing history, or web-content data. It does not use your data
 for advertising or any purpose unrelated to its single function (comparing
 Wikipedia language editions).
@@ -51,4 +53,4 @@ that data flow will be disclosed separately before release.
 
 ## Contact
 
-Source code and issues: https://github.com/mafgin/wikilens
+Source code and issues: https://github.com/mafgin/parallax

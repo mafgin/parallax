@@ -8,18 +8,18 @@ const $save = document.getElementById("save-btn");
 const $status = document.getElementById("status");
 
 async function load() {
-  const { readingLang, provider } = await browser.storage.local.get([
-    "readingLang",
-    "provider",
+  const { wlReadingLang, wlProvider } = await browser.storage.local.get([
+    "wlReadingLang",
+    "wlProvider",
   ]);
-  if (readingLang) $reading.value = readingLang;
-  if (provider) $provider.value = provider;
+  if (wlReadingLang) $reading.value = wlReadingLang;
+  if (wlProvider) $provider.value = wlProvider;
 }
 
 async function save() {
   await browser.storage.local.set({
-    readingLang: $reading.value,
-    provider: $provider.value,
+    wlReadingLang: $reading.value,
+    wlProvider: $provider.value,
   });
   $status.textContent = "saved";
   $status.className = "status ok";
