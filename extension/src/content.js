@@ -481,6 +481,26 @@
     if (gen !== pane.gen) return; // superseded by a language switch / close
     pane.art = art;
     await renderPaneBody(pane, gen);
+    if (!pane.isSource && gen === pane.gen) recordComparison(pane.lang);
+  }
+
+  // Anonymous usage counter: (day, source lang, source title, compared lang).
+  // Fires only on the extension's own action; batched + flushed daily by the
+  // background. Default on, opt-out in Settings — see PRIVACY.md.
+  function recordComparison(toLang) {
+    bg({ type: "stat-count", sl: current.lang, st: current.title, tl: toLang }).catch(() => {});
+    statsNoticeOnce();
+  }
+
+  async function statsNoticeOnce() {
+    const { wlStatsNoticeShown, wlStatsEnabled } = await browser.storage.local.get([
+      "wlStatsNoticeShown", "wlStatsEnabled",
+    ]);
+    if (wlStatsNoticeShown || wlStatsEnabled === false) return;
+    browser.storage.local.set({ wlStatsNoticeShown: true });
+    setStatus(
+      "Parallax counts which articles get compared — anonymously, like Wikipedia's public pageview stats. Never who. Turn off in Settings."
+    );
   }
 
   // Render (or re-render) a column's body from the fetched article. Used on load

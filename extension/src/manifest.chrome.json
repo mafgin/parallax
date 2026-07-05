@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Parallax — Compare Wikipedia Editions",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Read the same Wikipedia article from other language editions, translated side by side — see how each edition tells the story.",
   "icons": {
     "48": "icons/icon-48.png",
@@ -11,7 +11,8 @@
   "minimum_chrome_version": "138",
   "permissions": ["activeTab", "storage"],
   "host_permissions": [
-    "https://*.wikipedia.org/*"
+    "https://*.wikipedia.org/*",
+    "https://stats.afginlabs.com/*"
   ],
   "background": {
     "service_worker": "background.js"

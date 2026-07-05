@@ -10,10 +10,10 @@ consent), PRIVACY.md §Firefox, and a one-time in-product notice.
 
 ```
 cd extension && ./build.sh
-cd dist-firefox && zip -rq ../parallax-firefox-0.1.0.zip .
+cd dist-firefox && zip -rq ../parallax-firefox-0.2.0.zip .
 ```
 
-Upload `extension/parallax-firefox-0.1.0.zip`. No source-code package needed —
+Upload `extension/parallax-firefox-0.2.0.zip`. No source-code package needed —
 vanilla JS, no bundler/minification (the zip IS the source).
 
 Pre-flight: `web-ext lint --source-dir dist-firefox` must be clean.
@@ -66,11 +66,16 @@ Education; Language Tools (per AMO's picker — "Language & Translation" family)
 
 ## Data collection disclosure (AMO form + manifest)
 
-- Manifest: `data_collection_permissions.required = ["websiteContent"]` —
-  Firefox shows this in the install dialog.
-- Form: transmits website content (article text of pages the user explicitly
-  compares) to a third-party translation service (Google). No PII, no browsing
-  activity, no telemetry. Not sold, not shared beyond the translation request.
+- Manifest: `data_collection_permissions.required = ["websiteContent",
+  "browsingActivity"]` — Firefox shows both in the install dialog.
+- Form, two flows:
+  1. **websiteContent** — article text of pages the user explicitly compares is
+     transmitted to a translation service (Google) to produce the translation.
+  2. **browsingActivity** — anonymous usage counters: (day, source language,
+     article title, compared language, count), batched daily, no identifiers,
+     no IPs stored; default on with in-product notice + Settings opt-out; the
+     aggregate is a public dataset (like Wikimedia pageview stats).
+- No PII, nothing sold or shared beyond the above.
 - Privacy policy URL: https://github.com/mafgin/parallax/blob/main/PRIVACY.md
 
 ## Permission justifications

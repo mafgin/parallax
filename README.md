@@ -77,5 +77,11 @@ because it restricts commercial use.
 
 ## Privacy
 
-Parallax collects nothing. On Chrome/Edge, translation runs entirely on-device
-and no article content leaves your browser. See [`PRIVACY.md`](PRIVACY.md).
+Parallax collects no personal data — no accounts, no identifiers, no browsing
+history. On Chrome/Edge, translation runs entirely on-device and no article
+content leaves your browser.
+
+The one thing it counts (anonymously, opt-out in Settings) is **which articles
+get compared between which languages** — day-level counts only, published as an
+[open dataset](https://stats.afginlabs.com/v1/export), the same way Wikipedia
+publishes per-article pageview statistics. Details in [`PRIVACY.md`](PRIVACY.md).
