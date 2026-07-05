@@ -4,3 +4,7 @@
 *.xpi
 stats-server/data/
 stats-server/logs/
+/CLAUDE.md
+/HANDOVER.md
+/ONBOARDING.md
+/CATALOG.yml
