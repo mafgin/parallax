@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <!-- Parallax mark: two panes of the same thing, not quite aligned.
+       Paper chip keeps the mark legible on light AND dark browser toolbars. -->
+  <rect x="0" y="0" width="128" height="128" rx="28" fill="#F6F5F1"/>
+  <rect x="28" y="24" width="30" height="68" fill="#141412"/>
+  <rect x="70" y="36" width="30" height="68" fill="#3366CC"/>
+</svg>

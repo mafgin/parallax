@@ -4,6 +4,7 @@
   "version": "0.2.0",
   "description": "Read the same Wikipedia article from other language editions, translated side by side — see how each edition tells the story.",
   "icons": {
+    "16": "icons/icon-16.png",
     "48": "icons/icon-48.png",
     "96": "icons/icon-96.png",
     "128": "icons/icon-128.png"
@@ -13,11 +14,17 @@
       "id": "parallax@afginlabs.com",
       "strict_min_version": "140.0",
       "data_collection_permissions": {
-        "required": ["websiteContent", "browsingActivity"]
+        "required": [
+          "websiteContent",
+          "browsingActivity"
+        ]
       }
     }
   },
-  "permissions": ["activeTab", "storage"],
+  "permissions": [
+    "activeTab",
+    "storage"
+  ],
   "host_permissions": [
     "https://*.wikipedia.org/*",
     "https://translate.googleapis.com/*",
@@ -35,6 +42,7 @@
     "default_title": "Parallax",
     "default_popup": "popup.html",
     "default_icon": {
+      "16": "icons/icon-16.png",
       "48": "icons/icon-48.png",
       "128": "icons/icon-128.png"
     }
@@ -45,7 +53,9 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://*.wikipedia.org/wiki/*"],
+      "matches": [
+        "https://*.wikipedia.org/wiki/*"
+      ],
       "js": [
         "lib/browser-polyfill.js",
         "lib/rtl.js",
